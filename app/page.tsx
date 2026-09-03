@@ -42,7 +42,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Toaster, toast } from '@/components/ui/toast';
 import {
   MAX_CANDIDATES,
   MAX_INPUT_BYTES,
@@ -65,6 +64,11 @@ type ViewMode = 'm3u' | 'xtream';
 type ContentType = 'live' | 'vod' | 'series';
 type Category = { id: string; name: string };
 type Stream = { id: string; name: string; extension: string };
+type Notice = {
+  id: number;
+  title: string;
+  type: 'success' | 'info' | 'warning' | 'error';
+};
 
 type DetailState =
   | { kind: 'types' }
@@ -104,13 +108,6 @@ const typeLabels: Record<ContentType, string> = {
   vod: 'Movies',
   series: 'Series',
 };
-
-function message(
-  title: string,
-  type: 'success' | 'info' | 'warning' | 'error' = 'info',
-) {
-  toast.add({ title, type, timeout: 3_000 });
-}
 
 function safeNumber(value: unknown, fallback = 0): number {
   const number = Number(value);
@@ -306,8 +303,10 @@ export default function Home() {
   const [detail, setDetail] = useState<DetailState>({ kind: 'types' });
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const runControllerRef = useRef<AbortController | null>(null);
+  const noticeIdRef = useRef(0);
 
   const working = useMemo(
     () =>
@@ -341,6 +340,18 @@ export default function Home() {
   const percent = progress.total
     ? Math.round((progress.completed / progress.total) * 100)
     : 0;
+
+  function message(
+    title: string,
+    type: 'success' | 'info' | 'warning' | 'error' = 'info',
+  ) {
+    noticeIdRef.current += 1;
+    const nextNotice = { id: noticeIdRef.current, title, type };
+    setNotice(nextNotice);
+    window.setTimeout(() => {
+      setNotice((current) => (current?.id === nextNotice.id ? null : current));
+    }, 3_000);
+  }
 
   useEffect(() => {
     const context = document.modelContext;
@@ -680,7 +691,7 @@ export default function Home() {
   }
 
   return (
-    <Toaster>
+    <>
       <main className="mx-auto min-h-screen w-full max-w-[1520px] px-4 py-5 sm:px-7 sm:py-8">
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -1346,6 +1357,22 @@ export default function Home() {
           </DialogContent>
         </Dialog>
       </main>
-    </Toaster>
+      {notice && (
+        <output
+          aria-live="polite"
+          className={`fixed right-4 bottom-4 z-50 max-w-sm rounded-2xl border px-4 py-3 text-sm font-medium shadow-xl ${
+            notice.type === 'error'
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : notice.type === 'warning'
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : notice.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-slate-200 bg-white text-slate-800'
+          }`}
+        >
+          {notice.title}
+        </output>
+      )}
+    </>
   );
 }
