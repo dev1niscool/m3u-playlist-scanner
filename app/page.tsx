@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -304,6 +304,7 @@ export default function Home() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [isFileDragging, setIsFileDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const runControllerRef = useRef<AbortController | null>(null);
   const noticeIdRef = useRef(0);
@@ -435,6 +436,55 @@ export default function Home() {
     } finally {
       if (fileRef.current) fileRef.current.value = '';
     }
+  }
+
+  function isFileDrag(event: DragEvent<HTMLElement>) {
+    return event.dataTransfer.types.includes('Files');
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLDivElement>) {
+    if (isRunning || !isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setIsFileDragging(true);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    if (isRunning || !isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+    setIsFileDragging(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    const nextTarget = event.relatedTarget;
+    if (
+      nextTarget instanceof Node &&
+      event.currentTarget.contains(nextTarget)
+    ) {
+      return;
+    }
+    setIsFileDragging(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setIsFileDragging(false);
+
+    if (isRunning) {
+      message('Stop the current check before loading another file', 'warning');
+      return;
+    }
+
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length !== 1) {
+      message('Drop one plain .txt file at a time', 'error');
+      return;
+    }
+    void handleFile(files[0]);
   }
 
   async function startScan() {
@@ -716,7 +766,31 @@ export default function Home() {
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(390px,.85fr)]">
           <section className="surface-shadow overflow-hidden rounded-[1.6rem] border bg-card/95">
             {showInput && (
-              <div className="p-5 sm:p-7 lg:p-9">
+              <div
+                className="relative p-5 transition-colors sm:p-7 lg:p-9"
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                {isFileDragging && (
+                  <output
+                    aria-live="polite"
+                    className="pointer-events-none absolute inset-3 z-20 grid place-items-center rounded-[1.35rem] border-2 border-dotted border-teal-600 bg-teal-50/95 p-6 text-center shadow-inner backdrop-blur-sm"
+                  >
+                    <div>
+                      <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-teal-600 text-white shadow-lg shadow-teal-900/15">
+                        <Upload className="size-5" aria-hidden="true" />
+                      </div>
+                      <p className="text-xl font-semibold tracking-[-0.03em] text-slate-900">
+                        Drop .txt file here
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        It stays on this device and replaces the current text.
+                      </p>
+                    </div>
+                  </output>
+                )}
                 <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">
@@ -816,6 +890,7 @@ export default function Home() {
                     className="h-11 rounded-xl bg-white px-4"
                     disabled={isRunning}
                     onClick={() => fileRef.current?.click()}
+                    title="Choose a .txt file, or drop one anywhere in this source box"
                   >
                     <Upload data-icon="inline-start" />
                     Choose .txt file
