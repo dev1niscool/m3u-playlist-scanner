@@ -1,0 +1,2001 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A private, portable M3U playlist credential scanner that runs in your browser."
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; img-src data:; connect-src http: https:; style-src 'sha256-vWGMa22hYyKNXZtG3kku78HylQpTjUCyRzmGwS8T0SY='; script-src 'sha256-BxOG+gJBxjVF4caGu3QZBD1M/RhBiOTxNu9NG3t8sJ0='"
+    />
+    <title>M3U Playlist Scanner — Portable Edition</title>
+    <style>
+      :root {
+  color-scheme: dark;
+  --background: #070b14;
+  --surface: #0e1524;
+  --surface-raised: #131d30;
+  --surface-soft: #0b1220;
+  --line: #26324a;
+  --line-strong: #3b4b69;
+  --text: #f5f8ff;
+  --muted: #9aa8bd;
+  --blue: #69a8ff;
+  --blue-strong: #3b82f6;
+  --cyan: #59d7d0;
+  --green: #4ade80;
+  --red: #fb7185;
+  --amber: #fbbf24;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(
+      circle at 18% -10%,
+      rgba(59, 130, 246, 0.18),
+      transparent 34rem
+    ),
+    radial-gradient(
+      circle at 95% 15%,
+      rgba(89, 215, 208, 0.1),
+      transparent 28rem
+    ),
+    var(--background);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button,
+.file-button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.file-button:focus-within,
+a:focus-visible {
+  outline: 3px solid rgba(105, 168, 255, 0.5);
+  outline-offset: 3px;
+}
+
+svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.shell {
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 32px 0 28px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 26px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #d7e7ff;
+  border: 1px solid rgba(105, 168, 255, 0.4);
+  border-radius: 15px;
+  background: linear-gradient(
+    145deg,
+    rgba(59, 130, 246, 0.24),
+    rgba(89, 215, 208, 0.08)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.topbar h1,
+.topbar p,
+h2,
+p {
+  margin: 0;
+}
+
+.topbar h1 {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  font-weight: 720;
+  letter-spacing: -0.025em;
+}
+
+.topbar p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.privacy-pill,
+.format-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 11px;
+  color: #bceee9;
+  border: 1px solid rgba(89, 215, 208, 0.26);
+  border-radius: 999px;
+  background: rgba(89, 215, 208, 0.08);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.privacy-pill {
+  margin-left: auto;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.75fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.source-card,
+.safety-card,
+.results {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(
+    160deg,
+    rgba(19, 29, 48, 0.92),
+    rgba(11, 18, 32, 0.96)
+  );
+  box-shadow: var(--shadow);
+}
+
+.source-card {
+  position: relative;
+  min-width: 0;
+  padding: 24px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.source-card.is-dragging {
+  border: 2px dashed var(--blue);
+  box-shadow:
+    0 0 0 5px rgba(105, 168, 255, 0.1),
+    var(--shadow);
+}
+
+.section-heading,
+.results-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--blue);
+  font-size: 0.73rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+h2 {
+  font-size: 1.2rem;
+  font-weight: 690;
+  letter-spacing: -0.02em;
+}
+
+.format-pill {
+  color: #cad9ed;
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.input-wrap {
+  position: relative;
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 270px;
+  resize: vertical;
+  padding: 18px;
+  color: #e7eef9;
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  background: rgba(4, 8, 16, 0.62);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 0.9rem;
+  line-height: 1.62;
+  caret-color: var(--blue);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+textarea::placeholder {
+  color: #65728a;
+}
+
+textarea:hover,
+textarea:focus {
+  border-color: rgba(105, 168, 255, 0.66);
+}
+
+textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 20px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 15px;
+  background: rgba(8, 16, 30, 0.96);
+  transition: opacity 150ms ease;
+}
+
+.source-card.is-dragging .drop-overlay {
+  opacity: 1;
+}
+
+.drop-overlay strong {
+  font-size: 1.06rem;
+}
+
+.drop-overlay span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.drop-icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 4px;
+  place-items: center;
+  color: #d7e7ff;
+  border: 1px solid rgba(105, 168, 255, 0.4);
+  border-radius: 17px;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.input-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 10px 2px 18px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.file-button,
+button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 15px;
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.88rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease,
+    opacity 120ms ease;
+}
+
+.file-button:hover,
+button:hover:not(:disabled) {
+  border-color: #536684;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.file-button:active,
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.minimum-control {
+  display: grid;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 620;
+}
+
+.minimum-control input {
+  width: 94px;
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: rgba(4, 8, 16, 0.62);
+}
+
+.primary-button {
+  min-width: 156px;
+  color: white;
+  border-color: transparent;
+  background: linear-gradient(135deg, #367ce8, #1d68d8);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.24);
+}
+
+.primary-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: linear-gradient(135deg, #4c8df3, #2774e5);
+}
+
+.progress-region {
+  margin-top: 18px;
+  padding: 14px 15px;
+  border: 1px solid rgba(105, 168, 255, 0.22);
+  border-radius: 13px;
+  background: rgba(59, 130, 246, 0.07);
+}
+
+.progress-copy {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 9px;
+  color: #cbd8ea;
+  font-size: 0.8rem;
+}
+
+.progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #202a3d;
+}
+
+.progress-track span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--blue-strong), var(--cyan));
+  transition: width 180ms ease;
+}
+
+.notice {
+  margin-top: 16px;
+  padding: 12px 14px;
+  color: #d8e4f4;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.notice.error {
+  color: #fecdd3;
+  border-color: rgba(251, 113, 133, 0.35);
+  background: rgba(251, 113, 133, 0.08);
+}
+
+.notice.warning {
+  color: #fde7a5;
+  border-color: rgba(251, 191, 36, 0.32);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.notice.success {
+  color: #bbf7d0;
+  border-color: rgba(74, 222, 128, 0.32);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.safety-card {
+  padding: 24px;
+}
+
+.safety-card > p {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.87rem;
+  line-height: 1.62;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 22px 0;
+}
+
+.stats div {
+  min-width: 0;
+  padding: 13px 8px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.stats strong,
+.stats span {
+  display: block;
+}
+
+.stats strong {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+}
+
+.safety-list {
+  display: grid;
+  gap: 15px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.safety-list li {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.check-mark {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: var(--green);
+  border: 1px solid rgba(74, 222, 128, 0.22);
+  border-radius: 8px;
+  background: rgba(74, 222, 128, 0.07);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.safety-list strong,
+.safety-list span {
+  display: block;
+}
+
+.safety-list strong {
+  margin-top: 1px;
+  font-size: 0.82rem;
+}
+
+.safety-list div span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.portable-note {
+  margin-top: 22px;
+  padding: 15px;
+  border: 1px solid rgba(251, 191, 36, 0.24);
+  border-radius: 14px;
+  background: rgba(251, 191, 36, 0.055);
+}
+
+.portable-note strong {
+  color: #fde68a;
+  font-size: 0.8rem;
+}
+
+.portable-note p {
+  margin-top: 5px;
+  color: #b8c3d4;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.portable-note a {
+  display: inline-block;
+  margin-top: 9px;
+  color: #9dc5ff;
+  font-size: 0.76rem;
+  font-weight: 650;
+  text-underline-offset: 3px;
+}
+
+.results {
+  margin-top: 20px;
+  padding: 24px;
+}
+
+.result-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.secondary-button,
+.ghost-button {
+  min-height: 39px;
+  font-size: 0.79rem;
+}
+
+.ghost-button {
+  color: var(--muted);
+  border-color: transparent;
+  background: transparent;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(4, 8, 16, 0.36);
+}
+
+.tabs button {
+  min-height: 36px;
+  flex: 1;
+  color: var(--muted);
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 0.8rem;
+}
+
+.tabs button[aria-selected='true'] {
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+}
+
+.tabs button span {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 3px;
+  padding: 0 6px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.7rem;
+}
+
+.result-list {
+  display: grid;
+  gap: 10px;
+}
+
+.result-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.8fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.result-identity {
+  min-width: 0;
+}
+
+.result-host {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.09);
+}
+
+.result-row.failed .status-dot {
+  background: var(--red);
+  box-shadow: 0 0 0 4px rgba(251, 113, 133, 0.09);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credential-line,
+.reason-line {
+  margin-top: 5px;
+  color: var(--muted);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.reason-line {
+  color: #fda4af;
+}
+
+.result-metrics {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.metric {
+  padding: 7px 9px;
+  color: #c8d5e7;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(4, 8, 16, 0.36);
+  font-size: 0.7rem;
+}
+
+.metric strong {
+  color: var(--text);
+  font-size: 0.74rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.row-actions button {
+  min-height: 36px;
+  padding: 0 11px;
+  font-size: 0.74rem;
+}
+
+.empty-state {
+  padding: 34px 18px;
+  color: var(--muted);
+  text-align: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  font-size: 0.86rem;
+}
+
+footer {
+  padding: 18px 8px 0;
+  color: #6f7c92;
+  text-align: center;
+  font-size: 0.74rem;
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .safety-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 20px;
+  }
+
+  .safety-card > .eyebrow,
+  .safety-card > h2,
+  .safety-card > p,
+  .stats {
+    grid-column: 1 / -1;
+  }
+
+  .portable-note {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .shell {
+    width: min(100% - 24px, 1240px);
+    padding-top: 20px;
+  }
+
+  .privacy-pill {
+    display: none;
+  }
+
+  .source-card,
+  .safety-card,
+  .results {
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  textarea {
+    min-height: 240px;
+    font-size: 0.84rem;
+  }
+
+  .minimum-control {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .minimum-control input {
+    width: 100%;
+  }
+
+  .file-button,
+  .primary-button {
+    flex: 1;
+  }
+
+  .safety-card {
+    display: block;
+  }
+
+  .portable-note {
+    margin-top: 20px;
+  }
+
+  .results-header,
+  .result-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .result-actions button {
+    width: 100%;
+  }
+
+  .result-row {
+    grid-template-columns: 1fr;
+  }
+
+  .row-actions button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
+            <path d="M5 8.5A7 7 0 0 1 12 2" />
+            <path d="M5 15.5A7 7 0 0 0 12 22" />
+            <path d="M19 8.5A7 7 0 0 0 12 2" />
+            <path d="M19 15.5A7 7 0 0 1 12 22" />
+            <path d="M8.5 12h7" />
+            <circle cx="12" cy="12" r="2.25" />
+          </svg>
+        </div>
+        <div>
+          <h1>M3U Playlist Scanner</h1>
+          <p>Portable single-file edition</p>
+        </div>
+        <span class="privacy-pill">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+          Runs locally
+        </span>
+      </header>
+
+      <section class="workspace" aria-label="Playlist scanner">
+        <section class="source-card" id="drop-zone">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Source</span>
+              <h2>Add playlist credentials</h2>
+            </div>
+            <span class="format-pill">Auto-detect</span>
+          </div>
+
+          <div class="input-wrap">
+            <textarea
+              id="source-input"
+              aria-label="Playlist credentials"
+              maxlength="2000000"
+              spellcheck="false"
+              placeholder="Paste M3U links, host / username / password rows, CSV, or scanner output…"
+            ></textarea>
+            <div class="drop-overlay" aria-hidden="true">
+              <div class="drop-icon">
+                <svg viewBox="0 0 24 24" width="27" height="27">
+                  <path d="M12 16V4" />
+                  <path d="m7 9 5-5 5 5" />
+                  <path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4" />
+                </svg>
+              </div>
+              <strong>Drop your .txt file here</strong>
+              <span>The file will only be read in this browser.</span>
+            </div>
+          </div>
+
+          <div class="input-meta">
+            <span id="file-status">Supports .txt files up to 2 MB</span>
+            <span id="character-count">0 / 2,000,000</span>
+          </div>
+
+          <div class="controls">
+            <label class="file-button" for="file-input">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                aria-hidden="true"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"
+                />
+                <path d="M14 2v6h6" />
+                <path d="M12 18v-6" />
+                <path d="m9 15 3-3 3 3" />
+              </svg>
+              Choose .txt file
+            </label>
+            <input
+              id="file-input"
+              type="file"
+              accept=".txt,text/plain"
+              hidden
+            />
+
+            <label class="minimum-control">
+              <span>Minimum connections</span>
+              <input
+                id="minimum-input"
+                type="number"
+                min="0"
+                max="9999"
+                value="1"
+                inputmode="numeric"
+              />
+            </label>
+
+            <button class="primary-button" id="scan-button" type="button">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                aria-hidden="true"
+              >
+                <path d="M4 4v6h6" />
+                <path d="M20 20v-6h-6" />
+                <path d="M20 9A8 8 0 0 0 6.7 5.3L4 10" />
+                <path d="M4 15a8 8 0 0 0 13.3 3.7L20 14" />
+              </svg>
+              <span>Check playlists</span>
+            </button>
+          </div>
+
+          <div class="progress-region" id="progress-region" hidden>
+            <div class="progress-copy">
+              <span id="progress-label">Checking authorized services…</span>
+              <span id="progress-count">0 / 0</span>
+            </div>
+            <div class="progress-track"><span id="progress-bar"></span></div>
+          </div>
+
+          <div
+            class="notice"
+            id="notice"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></div>
+        </section>
+
+        <aside class="safety-card">
+          <span class="eyebrow">Safe by design</span>
+          <h2>Your list stays on this device</h2>
+          <p>
+            Files and pasted text are read in memory and are never saved by this
+            page. Only the playlist server you supply receives each credential
+            during a check.
+          </p>
+
+          <div class="stats" aria-label="Scan totals">
+            <div><strong id="working-count">0</strong><span>Working</span></div>
+            <div><strong id="failed-count">0</strong><span>Failed</span></div>
+            <div>
+              <strong id="detected-count">0</strong><span>Detected</span>
+            </div>
+          </div>
+
+          <ul class="safety-list">
+            <li>
+              <span class="check-mark">✓</span>
+              <div>
+                <strong>No storage</strong
+                ><span>Closing or reloading clears the session.</span>
+              </div>
+            </li>
+            <li>
+              <span class="check-mark">✓</span>
+              <div>
+                <strong>Private hosts blocked</strong
+                ><span>Local and private-network targets are rejected.</span>
+              </div>
+            </li>
+            <li>
+              <span class="check-mark">✓</span>
+              <div>
+                <strong>Bounded checks</strong
+                ><span
+                  >500 unique entries, eight at a time, with timeouts.</span
+                >
+              </div>
+            </li>
+          </ul>
+
+          <div class="portable-note">
+            <strong>Portable browser limitation</strong>
+            <p>
+              HTTPS services must allow cross-origin requests. HTTP-only and
+              CORS-blocked services need the private hosted checker.
+            </p>
+            <a
+              href="https://m3u-playlist-scanner.dev1niscool.chatgpt.site/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Open private hosted checker</a
+            >
+          </div>
+        </aside>
+      </section>
+
+      <section class="results" id="results" hidden>
+        <div class="results-header">
+          <div>
+            <span class="eyebrow">Results</span>
+            <h2>Playlist status</h2>
+          </div>
+          <div class="result-actions">
+            <button
+              class="secondary-button"
+              id="download-button"
+              type="button"
+              disabled
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="17"
+                height="17"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="m7 10 5 5 5-5" />
+                <path d="M12 15V3" />
+              </svg>
+              Download working CSV
+            </button>
+            <button class="ghost-button" id="clear-button" type="button">
+              Clear session
+            </button>
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Result type">
+          <button
+            id="working-tab"
+            role="tab"
+            aria-selected="true"
+            type="button"
+          >
+            Working <span>0</span>
+          </button>
+          <button
+            id="failed-tab"
+            role="tab"
+            aria-selected="false"
+            type="button"
+          >
+            Failed <span>0</span>
+          </button>
+        </div>
+        <div class="result-list" id="result-list" aria-live="polite"></div>
+      </section>
+
+      <footer>
+        Only check playlists and services you own or are authorized to access.
+      </footer>
+    </main>
+
+    <script>
+      (() => {
+  'use strict';
+
+  const MAX_INPUT_BYTES = 2_000_000;
+  const MAX_CANDIDATES = 500;
+  const MAX_API_BYTES = 1_000_000;
+  const REQUEST_TIMEOUT_MS = 8_000;
+  const CHECK_CONCURRENCY = 8;
+  const BLOCKED_LABELS = new Set([
+    'host',
+    'login',
+    'null',
+    'pass',
+    'password',
+    'port',
+    'scan',
+    'undefined',
+    'url',
+    'user',
+    'username',
+  ]);
+
+  const elements = {
+    clearButton: document.querySelector('#clear-button'),
+    characterCount: document.querySelector('#character-count'),
+    detectedCount: document.querySelector('#detected-count'),
+    downloadButton: document.querySelector('#download-button'),
+    dropZone: document.querySelector('#drop-zone'),
+    failedCount: document.querySelector('#failed-count'),
+    failedTab: document.querySelector('#failed-tab'),
+    fileInput: document.querySelector('#file-input'),
+    fileStatus: document.querySelector('#file-status'),
+    minimumInput: document.querySelector('#minimum-input'),
+    notice: document.querySelector('#notice'),
+    progressBar: document.querySelector('#progress-bar'),
+    progressCount: document.querySelector('#progress-count'),
+    progressLabel: document.querySelector('#progress-label'),
+    progressRegion: document.querySelector('#progress-region'),
+    resultList: document.querySelector('#result-list'),
+    results: document.querySelector('#results'),
+    scanButton: document.querySelector('#scan-button'),
+    sourceInput: document.querySelector('#source-input'),
+    workingCount: document.querySelector('#working-count'),
+    workingTab: document.querySelector('#working-tab'),
+  };
+
+  const state = {
+    failed: [],
+    isChecking: false,
+    runController: null,
+    selectedTab: 'working',
+    working: [],
+  };
+
+  function textElement(tag, className, value) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    element.textContent = String(value);
+    return element;
+  }
+
+  function primitiveString(value) {
+    return ['string', 'number', 'boolean', 'bigint'].includes(typeof value)
+      ? String(value)
+      : '';
+  }
+
+  function containsControlCharacters(value) {
+    for (let index = 0; index < value.length; index += 1) {
+      const code = value.charCodeAt(index);
+      if (code <= 31 || code === 127) return true;
+    }
+    return false;
+  }
+
+  function cleanValue(value) {
+    return primitiveString(value)
+      .normalize('NFKC')
+      .trim()
+      .replace(/^[\s"'`{[(<]+|[\s"'`}\])>,;]+$/g, '');
+  }
+
+  function safeDecode(value) {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function isBlockedHostname(hostname) {
+    const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const mappedIpv4 = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+    if (mappedIpv4) return isBlockedHostname(mappedIpv4[1]);
+
+    const mappedHex = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mappedHex) {
+      const high = Number.parseInt(mappedHex[1], 16);
+      const low = Number.parseInt(mappedHex[2], 16);
+      return isBlockedHostname(
+        `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`,
+      );
+    }
+
+    if (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      host.endsWith('.test') ||
+      host.endsWith('.invalid') ||
+      host === '::' ||
+      host === '::1' ||
+      host.startsWith('fc') ||
+      host.startsWith('fd') ||
+      /^fe[89ab]/.test(host) ||
+      host.startsWith('ff')
+    ) {
+      return true;
+    }
+
+    const parts = host.split('.');
+    if (parts.length !== 4 || parts.some((part) => !/^\d{1,3}$/.test(part))) {
+      return false;
+    }
+
+    const octets = parts.map(Number);
+    if (octets.some((octet) => octet > 255)) return true;
+    const [a, b] = octets;
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    );
+  }
+
+  function normalizeHost(rawHost) {
+    const cleaned = cleanValue(rawHost).replace(/\/+$/, '');
+    if (
+      !cleaned ||
+      cleaned.length > 500 ||
+      containsControlCharacters(cleaned)
+    ) {
+      return null;
+    }
+
+    const withProtocol = /^https?:\/\//i.test(cleaned)
+      ? cleaned
+      : `https://${cleaned}`;
+
+    try {
+      const parsed = new URL(withProtocol);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+      if (
+        parsed.username ||
+        parsed.password ||
+        !parsed.hostname ||
+        isBlockedHostname(parsed.hostname)
+      ) {
+        return null;
+      }
+      if (parsed.port) {
+        const port = Number(parsed.port);
+        if (!Number.isInteger(port) || port < 1 || port > 65_535) return null;
+      }
+      return parsed.origin;
+    } catch {
+      return null;
+    }
+  }
+
+  function normalizeCandidate(hostValue, userValue, passValue) {
+    const host = normalizeHost(hostValue);
+    const user = cleanValue(safeDecode(userValue));
+    const pass = cleanValue(safeDecode(passValue));
+    if (!host || !user || !pass || user.length > 256 || pass.length > 256) {
+      return null;
+    }
+    if (containsControlCharacters(user) || containsControlCharacters(pass)) {
+      return null;
+    }
+    if (BLOCKED_LABELS.has(user.toLowerCase())) return null;
+    return { id: `${host}\u0000${user}\u0000${pass}`, host, user, pass };
+  }
+
+  function parseCsvLine(line) {
+    const values = [];
+    let current = '';
+    let quoted = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index];
+      if (character === '"') {
+        if (quoted && line[index + 1] === '"') {
+          current += '"';
+          index += 1;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (character === ',' && !quoted) {
+        values.push(cleanValue(current));
+        current = '';
+      } else {
+        current += character;
+      }
+    }
+
+    values.push(cleanValue(current));
+    return values;
+  }
+
+  function findField(record, names) {
+    const entry = Object.entries(record).find(([key]) =>
+      names.includes(key.toLowerCase().replace(/[^a-z]/g, '')),
+    );
+    return cleanValue(entry ? entry[1] : '');
+  }
+
+  function parsePlaylistText(text) {
+    if (typeof text !== 'string' || !text.trim()) return [];
+    const boundedText = text.slice(0, MAX_INPUT_BYTES);
+    const lines = boundedText.split(/\r?\n/, 50_000);
+    const candidates = new Map();
+    let lastHost = null;
+
+    const addCandidate = (hostValue, userValue, passValue) => {
+      if (candidates.size >= MAX_CANDIDATES) return;
+      const candidate = normalizeCandidate(hostValue, userValue, passValue);
+      if (candidate && !candidates.has(candidate.id)) {
+        candidates.set(candidate.id, candidate);
+      }
+    };
+
+    const hostPattern = /(https?:\/\/[^\s"'<>,]+)/i;
+    const userPattern =
+      /(?:^|[\s|,])(?:username|user|usr|login|credential|👤)\s*[:=|>-]+\s*["']?([^\s|,"'<>]+)/i;
+    const passPattern =
+      /(?:^|[\s|,])(?:password|pass|passwd|pwd|key|🔐)\s*[:=|>-]+\s*["']?([^\s|,"'<>]+)/i;
+
+    for (
+      let index = 0;
+      index < lines.length && candidates.size < MAX_CANDIDATES;
+      index += 1
+    ) {
+      const line = lines[index]
+        .normalize('NFKC')
+        .replace(/[├└│─║╚╔═➠→★✮•➤👉]/gu, ' ')
+        .trim();
+      if (line.length < 3 || line.length > 2_000) continue;
+
+      const urls = line.match(/https?:\/\/[^\s"'<>]+/gi) || [];
+      for (const rawUrl of urls) {
+        try {
+          const parsed = new URL(rawUrl.replace(/[),.;]+$/, ''));
+          const user =
+            parsed.searchParams.get('username') ||
+            parsed.searchParams.get('user');
+          const pass =
+            parsed.searchParams.get('password') ||
+            parsed.searchParams.get('pass');
+          if (user && pass) addCandidate(parsed.origin, user, pass);
+        } catch {
+          // Ignore malformed URL-shaped text.
+        }
+      }
+
+      if (line.startsWith('{') && line.endsWith('}')) {
+        try {
+          const record = JSON.parse(line);
+          const host = findField(record, [
+            'host',
+            'url',
+            'server',
+            'portal',
+            'panel',
+            'endpoint',
+          ]);
+          const user = findField(record, ['user', 'username', 'usr', 'login']);
+          const pass = findField(record, ['pass', 'password', 'passwd', 'pwd']);
+          if (host && user && pass) addCandidate(host, user, pass);
+        } catch {
+          // JSON-like log lines continue through the labeled parser below.
+        }
+      }
+
+      if (line.includes(',')) {
+        const parts = parseCsvLine(line);
+        const urlIndex = parts.findIndex((part) => /^https?:\/\//i.test(part));
+        if (urlIndex >= 0) {
+          if (
+            parts[urlIndex + 1] &&
+            parts[urlIndex + 2] &&
+            !/^\d{1,5}$/.test(parts[urlIndex + 1])
+          ) {
+            addCandidate(
+              parts[urlIndex],
+              parts[urlIndex + 1],
+              parts[urlIndex + 2],
+            );
+          } else if (parts[urlIndex + 2] && parts[urlIndex + 3]) {
+            addCandidate(
+              parts[urlIndex],
+              parts[urlIndex + 2],
+              parts[urlIndex + 3],
+            );
+          }
+        }
+      }
+
+      const hostMatch = line.match(hostPattern);
+      const userMatch = line.match(userPattern);
+      const passMatch = line.match(passPattern);
+      if (hostMatch) lastHost = normalizeHost(hostMatch[1]);
+      if (userMatch && passMatch && ((hostMatch && hostMatch[1]) || lastHost)) {
+        addCandidate(
+          (hostMatch && hostMatch[1]) || lastHost || '',
+          userMatch[1],
+          passMatch[1],
+        );
+        continue;
+      }
+
+      const parts = line
+        .split(/[\s|\t]+/)
+        .map(cleanValue)
+        .filter(Boolean);
+      if (parts.length === 3) {
+        if (/^https?:\/\//i.test(parts[0])) {
+          addCandidate(parts[0], parts[1], parts[2]);
+        } else if (/^https?:\/\//i.test(parts[2])) {
+          addCandidate(parts[2], parts[0], parts[1]);
+        }
+      } else if (parts.length === 2 && /^https?:\/\//i.test(parts[0])) {
+        const separator = parts[1].indexOf(':');
+        if (separator > 0) {
+          addCandidate(
+            parts[0],
+            parts[1].slice(0, separator),
+            parts[1].slice(separator + 1),
+          );
+        }
+      }
+
+      if (lastHost) {
+        const withoutHost = line
+          .replace((hostMatch && hostMatch[1]) || '', ' ')
+          .trim();
+        const combo = withoutHost.match(
+          /^([\w.@-]{1,256})\s*[:|]\s*([^\s|]{1,256})$/,
+        );
+        if (combo && !/^https?$/i.test(combo[1])) {
+          addCandidate(lastHost, combo[1], combo[2]);
+        }
+
+        if (userMatch && !passMatch) {
+          for (
+            let offset = 1;
+            offset <= 3 && index + offset < lines.length;
+            offset += 1
+          ) {
+            const nextPass = lines[index + offset]
+              .normalize('NFKC')
+              .match(passPattern);
+            if (nextPass) {
+              addCandidate(lastHost, userMatch[1], nextPass[1]);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return [...candidates.values()];
+  }
+
+  function buildApiUrl(candidate) {
+    const url = new URL('/player_api.php', `${candidate.host}/`);
+    url.searchParams.set('username', candidate.user);
+    url.searchParams.set('password', candidate.pass);
+    return url.toString();
+  }
+
+  function buildM3uUrl(candidate) {
+    const url = new URL('/get.php', `${candidate.host}/`);
+    url.searchParams.set('username', candidate.user);
+    url.searchParams.set('password', candidate.pass);
+    url.searchParams.set('type', 'm3u_plus');
+    url.searchParams.set('output', 'ts');
+    return url.toString();
+  }
+
+  function safeNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : fallback;
+  }
+
+  function evaluatePayload(payload, minimum) {
+    if (!payload || typeof payload !== 'object') {
+      return { status: 'failed', reason: 'Unexpected server response' };
+    }
+
+    const userInfo = payload.user_info;
+    if (!userInfo || typeof userInfo !== 'object') {
+      return { status: 'failed', reason: 'Credentials were not accepted' };
+    }
+
+    const authenticated =
+      ['string', 'number'].includes(typeof userInfo.auth) &&
+      String(userInfo.auth) === '1';
+    const activeStatus =
+      typeof userInfo.status === 'string' &&
+      userInfo.status.toLowerCase() === 'active';
+    if (!authenticated || !activeStatus) {
+      return {
+        status: 'failed',
+        reason: 'Invalid, inactive, or expired credentials',
+      };
+    }
+
+    const max =
+      userInfo.max_connections === null || userInfo.max_connections === ''
+        ? null
+        : safeNumber(userInfo.max_connections);
+    if (max !== null && max < minimum) {
+      return {
+        status: 'failed',
+        reason: `Max connections (${max}) is below ${minimum}`,
+      };
+    }
+
+    const expirySeconds = safeNumber(userInfo.exp_date);
+    return {
+      status: 'working',
+      active: safeNumber(userInfo.active_cons),
+      max,
+      expiry: expirySeconds > 0 ? expirySeconds * 1_000 : null,
+    };
+  }
+
+  async function readJsonWithLimit(response) {
+    if (!response.body) return response.json();
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > MAX_API_BYTES) throw new Error('Response is too large');
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
+
+  async function checkCandidate(candidate, minimum, runSignal) {
+    if (
+      window.location.protocol === 'https:' &&
+      candidate.host.startsWith('http://')
+    ) {
+      return {
+        ...candidate,
+        status: 'failed',
+        reason:
+          'HTTP endpoint blocked by the browser; use the private hosted checker',
+      };
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      REQUEST_TIMEOUT_MS,
+    );
+    const abortRun = () => controller.abort();
+    runSignal.addEventListener('abort', abortRun, { once: true });
+
+    try {
+      const response = await fetch(buildApiUrl(candidate), {
+        cache: 'no-store',
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+        mode: 'cors',
+        referrerPolicy: 'no-referrer',
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        return {
+          ...candidate,
+          status: 'failed',
+          reason: `Server returned HTTP ${response.status}`,
+        };
+      }
+      return {
+        ...candidate,
+        ...evaluatePayload(await readJsonWithLimit(response), minimum),
+      };
+    } catch (error) {
+      if (controller.signal.aborted) {
+        if (runSignal.aborted) return null;
+        return { ...candidate, status: 'failed', reason: 'Request timed out' };
+      }
+      return {
+        ...candidate,
+        status: 'failed',
+        reason:
+          error instanceof SyntaxError
+            ? 'Server returned invalid JSON'
+            : 'Browser blocked the response (CORS or network policy); use the private hosted checker',
+      };
+    } finally {
+      window.clearTimeout(timeout);
+      runSignal.removeEventListener('abort', abortRun);
+    }
+  }
+
+  function setNotice(message, type = 'info') {
+    elements.notice.textContent = message;
+    elements.notice.className = `notice ${type}`;
+    elements.notice.hidden = !message;
+  }
+
+  function updateCharacterCount() {
+    elements.characterCount.textContent = `${elements.sourceInput.value.length.toLocaleString()} / ${MAX_INPUT_BYTES.toLocaleString()}`;
+  }
+
+  function updateCounts(detected) {
+    elements.workingCount.textContent = String(state.working.length);
+    elements.failedCount.textContent = String(state.failed.length);
+    elements.detectedCount.textContent = String(detected);
+    elements.workingTab.querySelector('span').textContent = String(
+      state.working.length,
+    );
+    elements.failedTab.querySelector('span').textContent = String(
+      state.failed.length,
+    );
+  }
+
+  function formatExpiry(value) {
+    if (!value) return 'No expiry';
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date(value));
+    } catch {
+      return 'Unknown expiry';
+    }
+  }
+
+  function makeMetric(label, value) {
+    const metric = textElement('span', 'metric', '');
+    const strong = textElement('strong', '', value);
+    metric.append(strong, document.createTextNode(` ${label}`));
+    return metric;
+  }
+
+  async function copyText(value) {
+    if (!navigator.clipboard || !window.isSecureContext) {
+      setNotice(
+        'Clipboard access is unavailable here. Open the hosted checker to copy securely.',
+        'warning',
+      );
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      setNotice('Playlist URL copied to the clipboard.', 'success');
+    } catch {
+      setNotice('The browser did not allow clipboard access.', 'warning');
+    }
+  }
+
+  function renderRow(result) {
+    const row = document.createElement('article');
+    row.className = `result-row ${result.status}`;
+
+    const identity = document.createElement('div');
+    identity.className = 'result-identity';
+    const hostLine = document.createElement('div');
+    hostLine.className = 'result-host';
+    hostLine.append(
+      textElement('span', 'status-dot', ''),
+      textElement('span', 'truncate', result.host),
+    );
+    identity.append(hostLine);
+
+    if (result.status === 'working') {
+      const credentialLine = textElement(
+        'div',
+        'credential-line truncate',
+        `${result.user}  •  ••••••••`,
+      );
+      identity.append(credentialLine);
+    } else {
+      identity.append(textElement('div', 'reason-line', result.reason));
+    }
+
+    const metrics = document.createElement('div');
+    metrics.className = 'result-metrics';
+    if (result.status === 'working') {
+      metrics.append(
+        makeMetric('active', result.active),
+        makeMetric('max', result.max === null ? '—' : result.max),
+        makeMetric('', formatExpiry(result.expiry)),
+      );
+    } else {
+      metrics.append(makeMetric('', 'Not confirmed'));
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'row-actions';
+    if (result.status === 'working') {
+      const copyButton = textElement('button', '', 'Copy M3U');
+      copyButton.type = 'button';
+      copyButton.addEventListener('click', () => copyText(buildM3uUrl(result)));
+      actions.append(copyButton);
+    }
+
+    row.append(identity, metrics, actions);
+    return row;
+  }
+
+  function renderResults() {
+    elements.resultList.replaceChildren();
+    const values =
+      state.selectedTab === 'working' ? state.working : state.failed;
+    if (values.length === 0) {
+      elements.resultList.append(
+        textElement(
+          'div',
+          'empty-state',
+          state.selectedTab === 'working'
+            ? 'No working playlists have been confirmed in this run.'
+            : 'No failed checks in this run.',
+        ),
+      );
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    for (const result of values) fragment.append(renderRow(result));
+    elements.resultList.append(fragment);
+  }
+
+  function selectTab(tab) {
+    state.selectedTab = tab;
+    const showingWorking = tab === 'working';
+    elements.workingTab.setAttribute('aria-selected', String(showingWorking));
+    elements.failedTab.setAttribute('aria-selected', String(!showingWorking));
+    renderResults();
+  }
+
+  function setChecking(checking) {
+    state.isChecking = checking;
+    elements.sourceInput.disabled = checking;
+    elements.fileInput.disabled = checking;
+    elements.minimumInput.disabled = checking;
+    elements.scanButton.querySelector('span').textContent = checking
+      ? 'Stop checking'
+      : 'Check playlists';
+  }
+
+  function updateProgress(completed, total) {
+    elements.progressRegion.hidden = false;
+    elements.progressCount.textContent = `${completed} / ${total}`;
+    elements.progressBar.style.width = `${total ? (completed / total) * 100 : 0}%`;
+  }
+
+  async function scan() {
+    if (state.isChecking) {
+      state.runController.abort();
+      return;
+    }
+
+    const candidates = parsePlaylistText(elements.sourceInput.value);
+    if (candidates.length === 0) {
+      setNotice(
+        'No valid host, username, and password combinations were detected.',
+        'error',
+      );
+      return;
+    }
+
+    const minimum = Math.max(
+      0,
+      Math.min(9999, Number(elements.minimumInput.value) || 0),
+    );
+    state.working = [];
+    state.failed = [];
+    state.selectedTab = 'working';
+    state.runController = new AbortController();
+    elements.results.hidden = false;
+    elements.progressLabel.textContent = 'Checking authorized services…';
+    elements.downloadButton.disabled = true;
+    setNotice('', 'info');
+    setChecking(true);
+    updateCounts(candidates.length);
+    updateProgress(0, candidates.length);
+    selectTab('working');
+
+    let nextIndex = 0;
+    let completed = 0;
+    const worker = async () => {
+      while (
+        nextIndex < candidates.length &&
+        !state.runController.signal.aborted
+      ) {
+        const candidate = candidates[nextIndex];
+        nextIndex += 1;
+        const result = await checkCandidate(
+          candidate,
+          minimum,
+          state.runController.signal,
+        );
+        if (!result) break;
+        if (result.status === 'working') state.working.push(result);
+        else state.failed.push(result);
+        completed += 1;
+        updateProgress(completed, candidates.length);
+        updateCounts(candidates.length);
+      }
+    };
+
+    await Promise.all(
+      Array.from(
+        { length: Math.min(CHECK_CONCURRENCY, candidates.length) },
+        () => worker(),
+      ),
+    );
+
+    const stopped = state.runController.signal.aborted;
+    setChecking(false);
+    elements.progressLabel.textContent = stopped
+      ? 'Check stopped'
+      : 'Check complete';
+    elements.downloadButton.disabled = state.working.length === 0;
+    renderResults();
+
+    const policyFailures = state.failed.filter((result) =>
+      /browser|CORS|network policy/i.test(result.reason),
+    ).length;
+    if (stopped) {
+      setNotice(
+        `Stopped after ${completed} of ${candidates.length} checks.`,
+        'warning',
+      );
+    } else if (policyFailures > 0) {
+      setNotice(
+        `${state.working.length} working confirmed. ${policyFailures} checks were blocked by portable-browser security rules; those entries were not classified as inactive.`,
+        'warning',
+      );
+    } else {
+      setNotice(
+        `${state.working.length} working and ${state.failed.length} failed checks.`,
+        state.working.length ? 'success' : 'warning',
+      );
+    }
+  }
+
+  function csvCell(value) {
+    let text = primitiveString(value);
+    if (/^[=+@\t\r-]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  function downloadWorkingCsv() {
+    if (state.working.length === 0) return;
+    const rows = [
+      ['host', 'username', 'password', 'active', 'max', 'expiry', 'm3u_url'],
+      ...state.working.map((result) => [
+        result.host,
+        result.user,
+        result.pass,
+        result.active,
+        result.max === null ? '' : result.max,
+        result.expiry ? new Date(result.expiry).toISOString() : '',
+        buildM3uUrl(result),
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'working-playlists.csv';
+    link.rel = 'noopener';
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
+
+  async function loadFile(file) {
+    if (!file) return;
+    if (file.size > MAX_INPUT_BYTES) {
+      setNotice('That file is larger than the 2 MB limit.', 'error');
+      return;
+    }
+    const isText =
+      file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
+    if (!isText) {
+      setNotice('Choose a plain .txt file.', 'error');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      elements.sourceInput.value = text.slice(0, MAX_INPUT_BYTES);
+      elements.fileStatus.textContent = `Loaded locally: ${file.name}`;
+      updateCharacterCount();
+      setNotice(`${file.name} is ready to check.`, 'success');
+    } catch {
+      setNotice('The browser could not read that file.', 'error');
+    } finally {
+      elements.fileInput.value = '';
+    }
+  }
+
+  function clearSession() {
+    if (state.runController) state.runController.abort();
+    state.working = [];
+    state.failed = [];
+    state.selectedTab = 'working';
+    elements.sourceInput.value = '';
+    elements.fileStatus.textContent = 'Supports .txt files up to 2 MB';
+    elements.results.hidden = true;
+    elements.progressRegion.hidden = true;
+    elements.progressBar.style.width = '0%';
+    elements.downloadButton.disabled = true;
+    setNotice('', 'info');
+    setChecking(false);
+    updateCharacterCount();
+    updateCounts(0);
+    elements.sourceInput.focus();
+  }
+
+  let dragDepth = 0;
+  window.addEventListener('dragenter', (event) => {
+    if (
+      !event.dataTransfer ||
+      !Array.from(event.dataTransfer.types).includes('Files')
+    )
+      return;
+    event.preventDefault();
+    dragDepth += 1;
+    elements.dropZone.classList.add('is-dragging');
+  });
+  window.addEventListener('dragover', (event) => {
+    if (
+      !event.dataTransfer ||
+      !Array.from(event.dataTransfer.types).includes('Files')
+    )
+      return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  });
+  window.addEventListener('dragleave', (event) => {
+    if (
+      !event.dataTransfer ||
+      !Array.from(event.dataTransfer.types).includes('Files')
+    )
+      return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) elements.dropZone.classList.remove('is-dragging');
+  });
+  window.addEventListener('drop', (event) => {
+    event.preventDefault();
+    dragDepth = 0;
+    elements.dropZone.classList.remove('is-dragging');
+    const files = event.dataTransfer ? event.dataTransfer.files : null;
+    if (files && files.length > 0) void loadFile(files[0]);
+  });
+
+  elements.sourceInput.addEventListener('input', () => {
+    elements.fileStatus.textContent = 'Pasted text — kept in this browser';
+    updateCharacterCount();
+  });
+  elements.fileInput.addEventListener('change', () => {
+    void loadFile(elements.fileInput.files[0]);
+  });
+  elements.scanButton.addEventListener('click', scan);
+  elements.downloadButton.addEventListener('click', downloadWorkingCsv);
+  elements.clearButton.addEventListener('click', clearSession);
+  elements.workingTab.addEventListener('click', () => selectTab('working'));
+  elements.failedTab.addEventListener('click', () => selectTab('failed'));
+
+  updateCharacterCount();
+  updateCounts(0);
+})();;
+    </script>
+  </body>
+</html>

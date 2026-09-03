@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A private, portable M3U playlist credential scanner that runs in your browser."
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; img-src data:; connect-src http: https:; style-src __STYLE_HASH__; script-src __SCRIPT_HASH__"
+    />
+    <title>M3U Playlist Scanner — Portable Edition</title>
+    <style>
+      __STYLE__
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
+            <path d="M5 8.5A7 7 0 0 1 12 2" />
+            <path d="M5 15.5A7 7 0 0 0 12 22" />
+            <path d="M19 8.5A7 7 0 0 0 12 2" />
+            <path d="M19 15.5A7 7 0 0 1 12 22" />
+            <path d="M8.5 12h7" />
+            <circle cx="12" cy="12" r="2.25" />
+          </svg>
+        </div>
+        <div>
+          <h1>M3U Playlist Scanner</h1>
+          <p>Portable single-file edition</p>
+        </div>
+        <span class="privacy-pill">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+          Runs locally
+        </span>
+      </header>
+
+      <section class="workspace" aria-label="Playlist scanner">
+        <section class="source-card" id="drop-zone">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Source</span>
+              <h2>Add playlist credentials</h2>
+            </div>
+            <span class="format-pill">Auto-detect</span>
+          </div>
+
+          <div class="input-wrap">
+            <textarea
+              id="source-input"
+              aria-label="Playlist credentials"
+              maxlength="2000000"
+              spellcheck="false"
+              placeholder="Paste M3U links, host / username / password rows, CSV, or scanner output…"
+            ></textarea>
+            <div class="drop-overlay" aria-hidden="true">
+              <div class="drop-icon">
+                <svg viewBox="0 0 24 24" width="27" height="27">
+                  <path d="M12 16V4" />
+                  <path d="m7 9 5-5 5 5" />
+                  <path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4" />
+                </svg>
+              </div>
+              <strong>Drop your .txt file here</strong>
+              <span>The file will only be read in this browser.</span>
+            </div>
+          </div>
+
+          <div class="input-meta">
+            <span id="file-status">Supports .txt files up to 2 MB</span>
+            <span id="character-count">0 / 2,000,000</span>
+          </div>
+
+          <div class="controls">
+            <label class="file-button" for="file-input">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                aria-hidden="true"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"
+                />
+                <path d="M14 2v6h6" />
+                <path d="M12 18v-6" />
+                <path d="m9 15 3-3 3 3" />
+              </svg>
+              Choose .txt file
+            </label>
+            <input
+              id="file-input"
+              type="file"
+              accept=".txt,text/plain"
+              hidden
+            />
+
+            <label class="minimum-control">
+              <span>Minimum connections</span>
+              <input
+                id="minimum-input"
+                type="number"
+                min="0"
+                max="9999"
+                value="1"
+                inputmode="numeric"
+              />
+            </label>
+
+            <button class="primary-button" id="scan-button" type="button">
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                aria-hidden="true"
+              >
+                <path d="M4 4v6h6" />
+                <path d="M20 20v-6h-6" />
+                <path d="M20 9A8 8 0 0 0 6.7 5.3L4 10" />
+                <path d="M4 15a8 8 0 0 0 13.3 3.7L20 14" />
+              </svg>
+              <span>Check playlists</span>
+            </button>
+          </div>
+
+          <div class="progress-region" id="progress-region" hidden>
+            <div class="progress-copy">
+              <span id="progress-label">Checking authorized services…</span>
+              <span id="progress-count">0 / 0</span>
+            </div>
+            <div class="progress-track"><span id="progress-bar"></span></div>
+          </div>
+
+          <div
+            class="notice"
+            id="notice"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></div>
+        </section>
+
+        <aside class="safety-card">
+          <span class="eyebrow">Safe by design</span>
+          <h2>Your list stays on this device</h2>
+          <p>
+            Files and pasted text are read in memory and are never saved by this
+            page. Only the playlist server you supply receives each credential
+            during a check.
+          </p>
+
+          <div class="stats" aria-label="Scan totals">
+            <div><strong id="working-count">0</strong><span>Working</span></div>
+            <div><strong id="failed-count">0</strong><span>Failed</span></div>
+            <div>
+              <strong id="detected-count">0</strong><span>Detected</span>
+            </div>
+          </div>
+
+          <ul class="safety-list">
+            <li>
+              <span class="check-mark">✓</span>
+              <div>
+                <strong>No storage</strong
+                ><span>Closing or reloading clears the session.</span>
+              </div>
+            </li>
+            <li>
+              <span class="check-mark">✓</span>
+              <div>
+                <strong>Private hosts blocked</strong
+                ><span>Local and private-network targets are rejected.</span>
+              </div>
+            </li>
+            <li>
+              <span class="check-mark">✓</span>
+              <div>
+                <strong>Bounded checks</strong
+                ><span
+                  >500 unique entries, eight at a time, with timeouts.</span
+                >
+              </div>
+            </li>
+          </ul>
+
+          <div class="portable-note">
+            <strong>Portable browser limitation</strong>
+            <p>
+              HTTPS services must allow cross-origin requests. HTTP-only and
+              CORS-blocked services need the private hosted checker.
+            </p>
+            <a
+              href="https://m3u-playlist-scanner.dev1niscool.chatgpt.site/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Open private hosted checker</a
+            >
+          </div>
+        </aside>
+      </section>
+
+      <section class="results" id="results" hidden>
+        <div class="results-header">
+          <div>
+            <span class="eyebrow">Results</span>
+            <h2>Playlist status</h2>
+          </div>
+          <div class="result-actions">
+            <button
+              class="secondary-button"
+              id="download-button"
+              type="button"
+              disabled
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="17"
+                height="17"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="m7 10 5 5 5-5" />
+                <path d="M12 15V3" />
+              </svg>
+              Download working CSV
+            </button>
+            <button class="ghost-button" id="clear-button" type="button">
+              Clear session
+            </button>
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Result type">
+          <button
+            id="working-tab"
+            role="tab"
+            aria-selected="true"
+            type="button"
+          >
+            Working <span>0</span>
+          </button>
+          <button
+            id="failed-tab"
+            role="tab"
+            aria-selected="false"
+            type="button"
+          >
+            Failed <span>0</span>
+          </button>
+        </div>
+        <div class="result-list" id="result-list" aria-live="polite"></div>
+      </section>
+
+      <footer>
+        Only check playlists and services you own or are authorized to access.
+      </footer>
+    </main>
+
+    <script>
+      __SCRIPT__;
+    </script>
+  </body>
+</html>
