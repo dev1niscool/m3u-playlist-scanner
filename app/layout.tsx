@@ -19,10 +19,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className={`${manrope.variable} ${geistMono.variable}`}>
-        {children}
-      </body>
+    <html lang="en" className={`${manrope.variable} ${geistMono.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }
