@@ -24,6 +24,10 @@ export type FailedResult = Candidate & {
 
 export type CheckResult = WorkingResult | FailedResult;
 
+export type ApiCheckOutcome =
+  | Pick<WorkingResult, 'status' | 'active' | 'max' | 'expiry'>
+  | Pick<FailedResult, 'status' | 'reason'>;
+
 const BLOCKED_LABELS = new Set([
   'host',
   'login',
@@ -72,15 +76,31 @@ function safeDecode(value: string): string {
 
 function isBlockedHostname(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const mappedIpv4 = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mappedIpv4) return isBlockedHostname(mappedIpv4[1]);
+
+  const mappedHex = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const high = Number.parseInt(mappedHex[1], 16);
+    const low = Number.parseInt(mappedHex[2], 16);
+    return isBlockedHostname(
+      `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`,
+    );
+  }
+
   if (
     host === 'localhost' ||
     host.endsWith('.localhost') ||
     host.endsWith('.local') ||
     host.endsWith('.internal') ||
+    host.endsWith('.test') ||
+    host.endsWith('.invalid') ||
+    host === '::' ||
     host === '::1' ||
     host.startsWith('fc') ||
     host.startsWith('fd') ||
-    host.startsWith('fe80:')
+    /^fe[89ab]/.test(host) ||
+    host.startsWith('ff')
   ) {
     return true;
   }
@@ -134,6 +154,24 @@ export function normalizeHost(rawHost: string): string | null {
   }
 }
 
+export function normalizeCandidateInput(
+  hostValue: string,
+  userValue: string,
+  passValue: string,
+): Candidate | null {
+  const host = normalizeHost(hostValue);
+  const user = cleanValue(safeDecode(userValue));
+  const pass = cleanValue(safeDecode(passValue));
+  if (!host || !user || !pass || user.length > 256 || pass.length > 256) {
+    return null;
+  }
+  if (containsControlCharacters(user) || containsControlCharacters(pass)) {
+    return null;
+  }
+  if (BLOCKED_LABELS.has(user.toLowerCase())) return null;
+  return { id: `${host}\u0000${user}\u0000${pass}`, host, user, pass };
+}
+
 function parseCsvLine(line: string): string[] {
   const values: string[] = [];
   let current = '';
@@ -180,16 +218,10 @@ export function parsePlaylistText(text: string): Candidate[] {
     passValue: string,
   ) => {
     if (candidates.size >= MAX_CANDIDATES) return;
-    const host = normalizeHost(hostValue);
-    const user = cleanValue(safeDecode(userValue));
-    const pass = cleanValue(safeDecode(passValue));
-    if (!host || !user || !pass || user.length > 256 || pass.length > 256)
-      return;
-    if (containsControlCharacters(user) || containsControlCharacters(pass))
-      return;
-    if (BLOCKED_LABELS.has(user.toLowerCase())) return;
-    const id = `${host}\u0000${user}\u0000${pass}`;
-    if (!candidates.has(id)) candidates.set(id, { id, host, user, pass });
+    const candidate = normalizeCandidateInput(hostValue, userValue, passValue);
+    if (candidate && !candidates.has(candidate.id)) {
+      candidates.set(candidate.id, candidate);
+    }
   };
 
   const hostPattern = /(https?:\/\/[^\s"'<>,]+)/i;
@@ -357,6 +389,57 @@ export function maskM3uUrl(candidate: Candidate): string {
   const url = new URL(buildM3uUrl(candidate));
   url.searchParams.set('password', '••••••••');
   return url.toString();
+}
+
+function safeNumber(value: unknown, fallback = 0): number {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+export function evaluatePlayerApiPayload(
+  payload: unknown,
+  minimum: number,
+): ApiCheckOutcome {
+  if (!payload || typeof payload !== 'object') {
+    return { status: 'failed', reason: 'Unexpected server response' };
+  }
+
+  const userInfo = (payload as { user_info?: unknown }).user_info;
+  if (!userInfo || typeof userInfo !== 'object') {
+    return { status: 'failed', reason: 'Credentials were not accepted' };
+  }
+
+  const info = userInfo as Record<string, unknown>;
+  const authenticated =
+    (typeof info.auth === 'string' || typeof info.auth === 'number') &&
+    String(info.auth) === '1';
+  const activeStatus =
+    typeof info.status === 'string' && info.status.toLowerCase() === 'active';
+  if (!authenticated || !activeStatus) {
+    return {
+      status: 'failed',
+      reason: 'Invalid, inactive, or expired credentials',
+    };
+  }
+
+  const max =
+    info.max_connections === null || info.max_connections === ''
+      ? null
+      : safeNumber(info.max_connections);
+  if (max !== null && max < minimum) {
+    return {
+      status: 'failed',
+      reason: `Max connections (${max}) is below ${minimum}`,
+    };
+  }
+
+  const expirySeconds = safeNumber(info.exp_date);
+  return {
+    status: 'working',
+    active: safeNumber(info.active_cons),
+    max,
+    expiry: expirySeconds > 0 ? expirySeconds * 1_000 : null,
+  };
 }
 
 export async function readJsonWithLimit(response: Response): Promise<unknown> {

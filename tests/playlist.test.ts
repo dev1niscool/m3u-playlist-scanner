@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildApiUrl,
   csvCell,
+  evaluatePlayerApiPayload,
   normalizeHost,
   parsePlaylistText,
 } from '../lib/playlist.ts';
@@ -38,8 +39,34 @@ void test('parses and decodes an M3U URL without retaining its path', () => {
 void test('rejects localhost, private networks, and executable URL schemes', () => {
   assert.equal(normalizeHost('http://127.0.0.1:8080'), null);
   assert.equal(normalizeHost('https://192.168.1.20'), null);
+  assert.equal(normalizeHost('http://[::ffff:7f00:1]'), null);
+  assert.equal(normalizeHost('http://[feb0::1]'), null);
   assert.equal(normalizeHost('https://service.local'), null);
   assert.equal(normalizeHost('javascript:alert(1)'), null);
+});
+
+void test('interprets active player API responses without exposing raw data', () => {
+  assert.deepEqual(
+    evaluatePlayerApiPayload(
+      {
+        user_info: {
+          auth: 1,
+          status: 'Active',
+          active_cons: '2',
+          max_connections: '4',
+          exp_date: '2000000000',
+        },
+        server_info: { sensitive: 'not returned' },
+      },
+      1,
+    ),
+    {
+      status: 'working',
+      active: 2,
+      max: 4,
+      expiry: 2_000_000_000_000,
+    },
+  );
 });
 
 void test('encodes credentials before constructing API URLs', () => {

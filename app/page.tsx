@@ -49,9 +49,11 @@ import {
   buildApiUrl,
   buildM3uUrl,
   csvCell,
+  evaluatePlayerApiPayload,
   maskM3uUrl,
   parsePlaylistText,
   readJsonWithLimit,
+  type ApiCheckOutcome,
   type Candidate,
   type CheckResult,
   type FailedResult,
@@ -109,11 +111,6 @@ const typeLabels: Record<ContentType, string> = {
   series: 'Series',
 };
 
-function safeNumber(value: unknown, fallback = 0): number {
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : fallback;
-}
-
 function mixedContentBlocked(candidate: Candidate): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -122,12 +119,77 @@ function mixedContentBlocked(candidate: Candidate): boolean {
   );
 }
 
+function privateRelayAvailable(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.endsWith('.chatgpt.site')
+  );
+}
+
+function relayCandidate(candidate: Candidate) {
+  return { host: candidate.host, user: candidate.user, pass: candidate.pass };
+}
+
+async function fetchRelay(
+  body: Record<string, unknown>,
+  signal: AbortSignal,
+): Promise<unknown> {
+  const response = await fetch('/api/check', {
+    method: 'POST',
+    cache: 'no-store',
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    referrerPolicy: 'no-referrer',
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok)
+    throw new Error(`Private checker returned ${response.status}`);
+  return readJsonWithLimit(response);
+}
+
+function parseRelayOutcome(payload: unknown): ApiCheckOutcome | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const outcome = (payload as { outcome?: unknown }).outcome;
+  if (!outcome || typeof outcome !== 'object') return null;
+  const value = outcome as Record<string, unknown>;
+
+  if (value.status === 'failed' && typeof value.reason === 'string') {
+    return {
+      status: 'failed',
+      reason: value.reason.slice(0, 200),
+    };
+  }
+
+  if (
+    value.status === 'working' &&
+    typeof value.active === 'number' &&
+    Number.isFinite(value.active) &&
+    (value.max === null ||
+      (typeof value.max === 'number' && Number.isFinite(value.max))) &&
+    (value.expiry === null ||
+      (typeof value.expiry === 'number' && Number.isFinite(value.expiry)))
+  ) {
+    return {
+      status: 'working',
+      active: value.active,
+      max: value.max as number | null,
+      expiry: value.expiry as number | null,
+    };
+  }
+
+  return null;
+}
+
 async function fetchApi(
   candidate: Candidate,
   action?: string,
   parameters?: Record<string, string>,
 ) {
-  if (mixedContentBlocked(candidate)) {
+  const useRelay = privateRelayAvailable();
+  if (mixedContentBlocked(candidate) && !useRelay) {
     throw new Error('HTTP endpoints cannot be checked from this secure page');
   }
 
@@ -137,6 +199,17 @@ async function fetchApi(
     REQUEST_TIMEOUT_MS,
   );
   try {
+    if (useRelay) {
+      const payload = await fetchRelay(
+        { candidate: relayCandidate(candidate), action, parameters },
+        controller.signal,
+      );
+      if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+        throw new Error('The private checker returned an invalid response');
+      }
+      return (payload as { data: unknown }).data;
+    }
+
     const response = await fetch(buildApiUrl(candidate, action, parameters), {
       cache: 'no-store',
       credentials: 'omit',
@@ -163,11 +236,12 @@ async function checkCandidate(
   minimum: number,
   runSignal: AbortSignal,
 ): Promise<CheckResult | null> {
-  if (mixedContentBlocked(candidate)) {
+  const useRelay = privateRelayAvailable();
+  if (mixedContentBlocked(candidate) && !useRelay) {
     return {
       ...candidate,
       status: 'failed',
-      reason: 'HTTP endpoint blocked on a secure page',
+      reason: 'HTTP checks require the private hosted version',
     };
   }
 
@@ -180,6 +254,22 @@ async function checkCandidate(
   runSignal.addEventListener('abort', abortRun, { once: true });
 
   try {
+    if (useRelay) {
+      const payload = await fetchRelay(
+        { candidate: relayCandidate(candidate), minimum },
+        controller.signal,
+      );
+      const outcome = parseRelayOutcome(payload);
+      if (!outcome) {
+        return {
+          ...candidate,
+          status: 'failed',
+          reason: 'Unexpected private checker response',
+        };
+      }
+      return { ...candidate, ...outcome };
+    }
+
     const response = await fetch(buildApiUrl(candidate), {
       cache: 'no-store',
       credentials: 'omit',
@@ -196,58 +286,11 @@ async function checkCandidate(
       };
     }
 
-    const payload = await readJsonWithLimit(response);
-    if (!payload || typeof payload !== 'object') {
-      return {
-        ...candidate,
-        status: 'failed',
-        reason: 'Unexpected server response',
-      };
-    }
-
-    const userInfo = (payload as { user_info?: unknown }).user_info;
-    if (!userInfo || typeof userInfo !== 'object') {
-      return {
-        ...candidate,
-        status: 'failed',
-        reason: 'Credentials were not accepted',
-      };
-    }
-
-    const info = userInfo as Record<string, unknown>;
-    const authenticated =
-      (typeof info.auth === 'string' || typeof info.auth === 'number') &&
-      String(info.auth) === '1';
-    const activeStatus =
-      typeof info.status === 'string' && info.status.toLowerCase() === 'active';
-    if (!authenticated || !activeStatus) {
-      return {
-        ...candidate,
-        status: 'failed',
-        reason: 'Invalid, inactive, or expired credentials',
-      };
-    }
-
-    const max =
-      info.max_connections === null || info.max_connections === ''
-        ? null
-        : safeNumber(info.max_connections);
-    if (max !== null && max < minimum) {
-      return {
-        ...candidate,
-        status: 'failed',
-        reason: `Max connections (${max}) is below ${minimum}`,
-      };
-    }
-
-    const expirySeconds = safeNumber(info.exp_date);
-    return {
-      ...candidate,
-      status: 'working',
-      active: safeNumber(info.active_cons),
-      max,
-      expiry: expirySeconds > 0 ? expirySeconds * 1_000 : null,
-    };
+    const outcome = evaluatePlayerApiPayload(
+      await readJsonWithLimit(response),
+      minimum,
+    );
+    return { ...candidate, ...outcome };
   } catch (error) {
     if (runSignal.aborted) return null;
     if (error instanceof DOMException && error.name === 'AbortError') {
@@ -1316,12 +1359,13 @@ export default function Home() {
                   Safe by design
                 </p>
                 <h2 className="text-2xl font-semibold tracking-[-0.035em]">
-                  Your data stays in the browser
+                  Your file stays local
                 </h2>
                 <p className="mt-3 text-[0.95rem] leading-6 text-slate-300">
-                  Pasted text and selected files are not uploaded or saved.
-                  Checks go directly to each public host you provide, subject to
-                  that host’s CORS policy.
+                  Pasted lists and selected files are never stored. On the
+                  private hosted site, each credential is sent transiently to a
+                  same-origin checker that contacts only the public playlist
+                  host you supplied.
                 </p>
 
                 <div className="mt-8 grid grid-cols-3 gap-2">
@@ -1387,8 +1431,8 @@ export default function Home() {
 
         <p className="mx-auto mt-5 max-w-3xl text-center text-xs leading-5 text-muted-foreground">
           Only check playlists and services you own or are authorized to access.
-          HTTP-only services cannot be reached from a secure HTTPS page; no
-          relay or proxy is used.
+          The private hosted version can relay checks to HTTP-only services; the
+          public GitHub Pages mirror can check HTTPS services only.
         </p>
 
         <Dialog open={failedOpen} onOpenChange={setFailedOpen}>
